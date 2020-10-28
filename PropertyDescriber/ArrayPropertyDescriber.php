@@ -31,21 +31,30 @@ class ArrayPropertyDescriber implements PropertyDescriberInterface, ModelRegistr
 
     public function describe(array $types, OA\Schema $property, array $groups = null)
     {
-        $type = $types[0]->getCollectionValueType();
-        if (null === $type) {
+        $valueType = $types[0]->getCollectionValueType();
+        if (null === $valueType) {
             throw new \LogicException(sprintf('Property "%s" is an array, but its items type isn\'t specified. You can specify that by using the type `string[]` for instance or `@OA\Property(type="array", @OA\Items(type="string"))`.', $property->title));
         }
 
-        $property->type = 'array';
         $this->setNullableProperty($types[0], $property);
-        $property = Util::getChild($property, OA\Items::class);
+
+        $keyType = $types[0]->getCollectionKeyType();
+        if (is_null($keyType)) {
+            $property->type = 'array';
+            $this->setNullableProperty($types[0], $property);
+            $property = Util::getChild($property, OA\Items::class);
+
+        } else {
+            $property->type = 'object';
+            $property = Util::getChild($property, OA\AdditionalProperties::class);
+        }
 
         foreach ($this->propertyDescribers as $propertyDescriber) {
             if ($propertyDescriber instanceof ModelRegistryAwareInterface) {
                 $propertyDescriber->setModelRegistry($this->modelRegistry);
             }
-            if ($propertyDescriber->supports([$type])) {
-                $propertyDescriber->describe([$type], $property, $groups);
+            if ($propertyDescriber->supports([$valueType])) {
+                $propertyDescriber->describe([$valueType], $property, $groups);
 
                 break;
             }
